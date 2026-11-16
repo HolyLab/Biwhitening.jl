@@ -169,8 +169,16 @@ size(Z)
 ```
 
 With the default [`HardThreshold`](@ref) these are the principal component scores of the
-scaled matrix, and distances between rows are in units of the noise: on a component well
-above the edge, each coordinate carries noise of about unit variance.
+scaled matrix. [`score_noise`](@ref) gives the noise variance of each column of the scores.
+It is close to one for a component well above the edge, where distances between rows are
+therefore in units of the noise, and it grows as a component approaches the edge, because
+the estimated singular vector then turns toward the noise:
+
+```@example guide
+round.(score_noise(bw, 1); digits=2)'
+```
+
+The sum of these values is the expected squared length of the noise in one row of `Z`.
 
 The rules differ in what they estimate best:
 

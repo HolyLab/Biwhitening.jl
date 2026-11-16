@@ -85,6 +85,32 @@
         @test_throws "applies to `scores`, not to `denoise`" denoise(bw, GramShrinker(1))
     end
 
+    @testset "noise in the scores" begin
+        c1 = shrink(bw, GramShrinker(1)) ./ shrink(bw, OperatorShrinker())
+        c2 = shrink(bw, GramShrinker(2)) ./ shrink(bw, OperatorShrinker())
+        @test score_noise(bw, 1) ≈ bw.S[1:3] .^ 2 .* (1 .- c1 .^ 2) ./ p
+        @test score_noise(bw, 2) ≈ bw.S[1:3] .^ 2 .* (1 .- c2 .^ 2) ./ q
+        @test score_noise(bw, 1) == score_noise(bw, 1, HardThreshold())
+        # The part of each column of the scores that lies outside the signal.
+        for (dim, W) in ((1, Us), (2, Vs))
+            Z = scores(bw, dim)
+            outside = Z .- W * (W' * Z)
+            @test vec(sum(abs2, outside; dims=1)) ./ size(Z, 1) ≈ score_noise(bw, dim) rtol = 0.1
+        end
+        # Weaker components carry more noise, and a strong one carries the noise of the data.
+        @test issorted(score_noise(bw, 1))
+        @test all(>(1), score_noise(bw, 1))
+        strong = biwhiten(Y .+ 30 .* X, ones(p, q))
+        @test score_noise(strong, 1) ≈ ones(3) rtol = 0.01
+        @test score_noise(strong, 2) ≈ ones(3) rtol = 0.01
+        # Shrinking a column of the scores shrinks its noise with it.
+        for s in (FrobeniusShrinker(), OperatorShrinker(), GramShrinker(1))
+            w = shrink(bw, s) ./ bw.S[1:3]
+            @test score_noise(bw, 1, s) ≈ w .^ 2 .* score_noise(bw, 1)
+        end
+        @test_throws "`dim` must be 1 or 2" score_noise(bw, 0)
+    end
+
     @testset "taller than wide" begin
         bwt = biwhiten(permutedims(Y), ones(q, p))
         for s in shrinkers
@@ -93,6 +119,8 @@
         end
         @test shrink(bwt, GramShrinker(1)) ≈ shrink(bw, GramShrinker(2))
         @test shrink(bwt, GramShrinker(2)) ≈ shrink(bw, GramShrinker(1))
+        @test score_noise(bwt, 1) ≈ score_noise(bw, 2)
+        @test score_noise(bwt, 2) ≈ score_noise(bw, 1)
     end
 
     @testset "counts return to the units of the data" begin

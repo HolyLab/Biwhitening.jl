@@ -29,6 +29,7 @@ bw = biwhiten(Y, fit.model)
 
 Yh = scaled(bw, Y)              # the scaled matrix, for use with other methods
 Z = scores(bw, 1)               # coordinates of the rows on the components
+score_noise(bw, 1)              # noise variance of each column of Z
 Xhat = denoise(bw)              # estimate of the expected value of Y
 ```
 

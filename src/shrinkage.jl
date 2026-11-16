@@ -107,13 +107,20 @@ true
 ```
 """
 function shrink(bw::Biwhitened{T}, shrinker::Shrinker=FrobeniusShrinker()) where {T}
+    sq = sqrt(T(_shape(bw)[2]))
+    return [sq * _shrunk(shrinker, y, x, c1, c2) for (y, x, c1, c2) in _spikes(bw)]
+end
+
+# For each singular value above the noise: `y` and the strength `x` of the signal, both in
+# units of `√q`, and the cosines between the observed singular vectors and those of the
+# signal on the left (`c1`) and on the right (`c2`).
+function _spikes(bw::Biwhitened{T}) where {T}
     p, q, rowsshort = _shape(bw)
     γ, sq = T(p) / T(q), sqrt(T(q))
     return map(view(bw.S, 1:rank(bw))) do s
         y = s / sq
         x, cshort, clong = _spike(y, γ)
-        c1, c2 = rowsshort ? (cshort, clong) : (clong, cshort)
-        sq * _shrunk(shrinker, y, x, c1, c2)
+        rowsshort ? (y, x, cshort, clong) : (y, x, clong, cshort)
     end
 end
 
@@ -130,6 +137,51 @@ unit variance in each coordinate. Rows and columns whose scale is zero have zero
 function scores(bw::Biwhitened, dim::Integer, shrinker::Shrinker=HardThreshold())
     dim in (1, 2) || throw(ArgumentError("`dim` must be 1 or 2, got $dim"))
     return (dim == 1 ? bw.U : bw.V) .* shrink(bw, shrinker)'
+end
+
+"""
+    v = score_noise(bw::Biwhitened, dim, shrinker::Shrinker=HardThreshold())
+
+The noise variance of each column of [`scores`](@ref)`(bw, dim, shrinker)`, averaged over
+the rows (`dim = 1`) or columns (`dim = 2`) of the data with a nonzero scale. `v` has one
+element for each of the `rank(bw)` components above the noise, and `sum(v)` is the expected
+squared length of the noise in one row of the scores.
+
+An observed singular vector is the sum of the signal's singular vector, multiplied by the
+cosine `c` of the angle between them, and a vector of noise of squared length `1 - c^2`
+(see [`Shrinker`](@ref)). A column of the scores is that vector times the singular value
+`η` from [`shrink`](@ref), so its noise variance is `η^2 * (1 - c^2) / n`, where `n` is the
+number of rows (or columns) with a nonzero scale. With the default `shrinker`, the result
+is close to one for a component far above [`noise_edge`](@ref) and larger for one near it.
+Like `shrink`, it assumes that the noise of the scaled matrix has variance one (see
+[`noise_variance`](@ref)).
+
+# Examples
+
+```jldoctest
+julia> Y = [40 1 0 2; 38 0 1 1; 1 0 2 1; 0 1 1 3];
+
+julia> bw = biwhiten(Y);
+
+julia> v = score_noise(bw, 1);
+
+julia> length(v) == rank(bw)
+true
+
+julia> w = shrink(bw) ./ shrink(bw, HardThreshold());    # weights of the Frobenius rule
+
+julia> score_noise(bw, 1, FrobeniusShrinker()) ≈ w .^ 2 .* v
+true
+```
+"""
+function score_noise(bw::Biwhitened{T}, dim::Integer, shrinker::Shrinker=HardThreshold()) where {T}
+    dim in (1, 2) || throw(ArgumentError("`dim` must be 1 or 2, got $dim"))
+    n = count(!iszero, dim == 1 ? bw.a : bw.b)
+    sq = sqrt(T(_shape(bw)[2]))
+    return map(_spikes(bw)) do (y, x, c1, c2)
+        c = dim == 1 ? c1 : c2
+        (sq * _shrunk(shrinker, y, x, c1, c2))^2 * (1 - c^2) / n
+    end
 end
 
 """

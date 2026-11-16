@@ -16,7 +16,7 @@ export biwhiten, Biwhitened, scaled, ks_distance, noise_variance, noise_edge, ra
 export QuadraticVariance, variance_estimate, fit_variance, VarianceFit
 export MarchenkoPastur
 export Shrinker, HardThreshold, FrobeniusShrinker, OperatorShrinker, NuclearShrinker, GramShrinker
-export shrink, scores, denoise
+export shrink, scores, score_noise, denoise
 
 # `public` is parsed as a keyword only from Julia 1.11; this package supports 1.10.
 @static if VERSION >= v"1.11"
