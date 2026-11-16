@@ -151,6 +151,13 @@
         @test startswith(str, "Biwhitened{Float64} of a 300×1000 matrix\n  rank: 10\n")
         @test occursin("noise variance: 1.0", str)
         @test occursin("Kolmogorov–Smirnov distance to the Marchenko–Pastur law: 0.03", str)
+        @test !occursin("if the noise has the estimated variance", str)
+        # Counts that are more variable than the model allows: the display also gives the
+        # rank for noise of the estimated variance.
+        b2 = biwhiten(2 .* Y)
+        @test noise_variance(b2) ≈ 2 atol = 0.1
+        @test rank(b2) > 10r
+        @test occursin("\n  rank: $(rank(b2)) ($r if the noise has the estimated variance)\n", sprint(show, MIME"text/plain"(), b2))
         @test sprint(show, bw) == "Biwhitened{Float64}(300×1000, rank 10)"
         @test sprint(show, [bw]) == "Biwhitened{Float64}[Biwhitened{Float64}(300×1000, rank 10)]"
     end

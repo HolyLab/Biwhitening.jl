@@ -85,7 +85,8 @@ numbers, both shown when a result is displayed, test this:
 
 - [`noise_variance`](@ref) is the noise variance of the scaled matrix, estimated from its
   median eigenvalue. It should be close to one. A larger value means that the noise exceeds
-  what the model predicts, and the rank is then overestimated.
+  what the model predicts, and the rank is then overestimated. When the estimate changes
+  the count, the display adds the rank for noise of the estimated variance.
 - [`ks_distance`](@ref) is the Kolmogorov–Smirnov distance between the eigenvalues and the
   Marchenko–Pastur law. Each component of the signal contributes one eigenvalue that the law
   does not describe, so the distance is at least the rank divided by the number of
