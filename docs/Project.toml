@@ -1,0 +1,6 @@
+[deps]
+Biwhitening = "d33ed278-bae2-4784-ac26-df10d88a54f2"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
+[sources]
+Biwhitening = {path = ".."}
