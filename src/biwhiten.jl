@@ -97,8 +97,11 @@ function Base.show(io::IO, ::MIME"text/plain", bw::Biwhitened{T}) where {T}
     m′, n′ = count(!iszero, bw.a), count(!iszero, bw.b)
     print(io, "Biwhitened{", T, "} of a ", m, "×", n, " matrix")
     (m′, n′) == (m, n) || print(io, " (", m′, "×", n′, " without empty rows and columns)")
-    print(io, "\n  rank: ", rank(bw))
-    print(io, "\n  noise variance: ", round(noise_variance(bw); sigdigits=4))
+    σ2 = noise_variance(bw)
+    k, kσ = rank(bw), count(>(sqrt(σ2) * noise_edge(bw)), bw.S)
+    print(io, "\n  rank: ", k)
+    k == kσ || print(io, " (", kσ, " if the noise has the estimated variance)")
+    print(io, "\n  noise variance: ", round(σ2; sigdigits=4))
     print(io, "\n  Kolmogorov–Smirnov distance to the Marchenko–Pastur law: ", round(ks_distance(bw); sigdigits=3))
     return nothing
 end
@@ -128,7 +131,9 @@ to the function [`shrink`](@ref).)
 
 `rank(bw)` assumes that the variance estimates have the right overall scale. Check that
 [`noise_variance`](@ref)`(bw)` is close to one and that [`ks_distance`](@ref)`(bw)` is small
-before relying on it.
+before relying on it. When the two differ, the display of `bw` also gives the number of
+singular values above `sqrt(noise_variance(bw)) * noise_edge(bw)`, the count for noise of
+the estimated variance.
 
 # Examples
 
