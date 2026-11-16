@@ -32,7 +32,7 @@
 
     @testset "Poisson counts" begin
         Y = [rpoisson(rng, x) for x in X]
-        fit = fit_variance(Y; grid=[0, 0.1, 0.5, 1])
+        fit = fit_variance(Y; grid=[0.5, 0, 1, 0.1, 0.5])
         @test fit.β == 0
         @test fit.α ≈ 1 atol = 0.05
         @test fit.model.b == fit.α && fit.model.c == 0
@@ -44,6 +44,13 @@
         fit5 = fit_variance(5 .* Y; grid=[0.0])
         @test fit5.model.b ≈ 5 * fit.α
         @test rank(biwhiten(5 .* Y, fit5.model)) == r
+    end
+
+    @testset "candidates with equal distance" begin
+        scan(ks...) = [(; ks=k) for k in ks]
+        @test Biwhitening._best(scan(0.3, 0.2, 0.4)) == 2
+        @test Biwhitening._best(scan(0.3, 0.1, 0.1, 0.1, 0.2)) == 3
+        @test Biwhitening._best(scan(0.1, 0.1, 0.2)) == 1
     end
 
     @testset "arguments" begin
