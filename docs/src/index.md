@@ -112,11 +112,12 @@ Ynb = [poisson(rng, x * gamma4(rng)) for x in X]
 biwhiten(Ynb)
 ```
 
-The fit tries a grid of weights `β` for the quadratic term and keeps the one whose spectrum
-is closest to the law:
+The fit tries several weights `β` for the quadratic term and keeps the one whose spectrum
+is closest to the law. It starts from a coarse grid and then halves the spacing around the
+best candidate twice:
 
 ```@example guide
-fit = fit_variance(Ynb; grid=0:0.1:1)
+fit = fit_variance(Ynb)
 ```
 
 ```@example guide
@@ -130,7 +131,12 @@ Three caveats apply to the fit:
 
 - `fit.scan` lists every candidate. When the distance changes little over a range of `β`,
   the spectrum does not determine `β` within that range. The rank is then uncertain to the
-  extent that the candidates in that range disagree about it.
+  extent that the candidates in that range disagree about it. Above, the candidates from
+  0.15 to 0.3 share the smallest distance that five components allow, 5/400, and the fit
+  takes the middle one.
+- The refinement assumes that the distance has a single minimum at the spacing of the
+  coarse grid. To examine every element of a grid of your own, pass it as `grid` with
+  `refine=0`.
 - Because the chosen candidate was selected for its small distance, that distance is biased
   downward. To assess the model without this bias, fit it on some of the rows, biwhiten the
   remaining rows with the fitted model, and compute their `ks_distance`.
@@ -235,7 +241,7 @@ undoes the scaling, but [`scores`](@ref) are coordinates in the scaled matrix.
 For an `m × n` matrix with `m ≤ n`, `biwhiten` forms the dense `m × m` Gram matrix of the
 scaled data and computes all of its eigenvalues. This takes memory proportional to `m^2` and
 time proportional to `m^2 * n + m^3`, whether or not the data are sparse. `fit_variance`
-repeats this for every element of its grid.
+repeats this for every candidate, at most ten by default.
 
 ## References
 
