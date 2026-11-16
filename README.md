@@ -23,6 +23,7 @@ bw = biwhiten(Y)                # Y: a matrix of counts with Poisson noise
 rank(bw)                        # number of components above the noise
 noise_variance(bw)              # close to 1 if the Poisson model fits
 ks_distance(bw)                 # distance of the spectrum from the Marchenko–Pastur law
+spectrumplot(bw)                # the spectrum against the law (needs a Makie backend)
 
 fit = fit_variance(Y)           # choose a quadratic variance model for overdispersed counts
 bw = biwhiten(Y, fit.model)
