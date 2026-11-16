@@ -11,12 +11,23 @@ using Test
 
 include("helpers.jl")
 
+# `spectrumplot` is implemented in an extension that loads with Makie. A session that has
+# already loaded Makie cannot observe its absence.
+const MAKIE_ABSENT = Base.get_extension(Biwhitening, :BiwhiteningMakieExt) === nothing
+const NOMAKIE_ERROR = try
+    spectrumplot(biwhiten([3 0 1 2; 0 2 5 1; 4 1 0 3]))
+catch err
+    err
+end
+using Makie: Makie, Axis, Figure
+
 @testset "Biwhitening.jl" begin
     include("marchenkopastur.jl")
     include("variance.jl")
     include("biwhiten.jl")
     include("fit.jl")
     include("shrinkage.jl")
+    include("plot.jl")
 
     @testset "Aqua" begin
         Aqua.test_all(Biwhitening)

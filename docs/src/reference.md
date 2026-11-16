@@ -13,6 +13,7 @@ scaled
 noise_edge
 noise_variance
 ks_distance
+spectrumplot
 ```
 
 ## Variance models

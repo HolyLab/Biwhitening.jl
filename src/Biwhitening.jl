@@ -17,6 +17,7 @@ export QuadraticVariance, variance_estimate, fit_variance, VarianceFit
 export MarchenkoPastur
 export Shrinker, HardThreshold, FrobeniusShrinker, OperatorShrinker, NuclearShrinker, GramShrinker
 export shrink, scores, score_noise, denoise
+export spectrumplot
 
 # `public` is parsed as a keyword only from Julia 1.11; this package supports 1.10.
 @static if VERSION >= v"1.11"
@@ -28,5 +29,6 @@ include("variance.jl")
 include("biwhiten.jl")
 include("fit.jl")
 include("shrinkage.jl")
+include("plot.jl")
 
 end

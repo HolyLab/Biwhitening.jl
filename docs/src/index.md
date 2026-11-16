@@ -92,9 +92,24 @@ numbers, both shown when a result is displayed, test this:
   does not describe, so the distance is at least the rank divided by the number of
   eigenvalues (here 5/400).
 
+Neither number replaces a look at the spectrum itself. With a Makie backend loaded,
+[`spectrumplot`](@ref) draws it:
+
+```@example guide
+using CairoMakie
+spectrumplot(bw)
+```
+
+On the right, the histogram of the singular values follows the Marchenko–Pastur law up to
+the noise edge, as it should when the variance model describes the noise. On the left, the
+five components of the signal stand well clear of the edge. Real data are seldom this
+clear: the singular values often descend into the bulk without a gap, and the count of
+components then depends on exactly where the edge lies. The plot shows how many components
+are in that position, and whether a change of slope sets some of them apart.
+
 `d = `[`MarchenkoPastur`](@ref)`(bw)` is the law for the eigenvalues `bw.S .^ 2 ./ q`, where
-`q` is the larger dimension of the matrix. Its probability density, the function
-[`Biwhitening.pdf`](@ref)`(d, x)`, can be drawn over a histogram of the eigenvalues.
+`q` is the larger dimension of the matrix, and [`Biwhitening.pdf`](@ref)`(d, x)` is its
+probability density, for drawing the comparison in another way.
 
 ## Choosing the variance model
 
