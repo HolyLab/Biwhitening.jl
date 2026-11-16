@@ -45,6 +45,7 @@ NuclearShrinker
 GramShrinker
 shrink
 scores
+score_noise
 denoise
 ```
 
