@@ -1,8 +1,8 @@
 """
-Biwhitening of a data matrix with heteroskedastic noise: scale its rows and columns so that
-the noise has unit average variance in each of them, compare the spectrum of the result with
-the Marchenko–Pastur law, count the components above the noise, and shrink their singular
-values.
+Separation of signal from noise in a data matrix whose noise variance differs from entry to
+entry. Biwhitening scales the rows and columns so that the noise has average variance one in
+each of them, compares the spectrum of the scaled matrix with the Marchenko–Pastur law,
+counts the components above the noise, and shrinks their singular values.
 
 The entry points are [`biwhiten`](@ref) and [`fit_variance`](@ref).
 """
@@ -12,7 +12,7 @@ using LinearAlgebra: LinearAlgebra, Diagonal, Symmetric, eigen, eigvals, mul!, r
 using MatrixCovers: noise_cover
 using Statistics: Statistics, median, quantile
 
-export biwhiten, Biwhitened, ks_distance, noise_variance, noise_edge, rank
+export biwhiten, Biwhitened, scaled, ks_distance, noise_variance, noise_edge, rank
 export QuadraticVariance, variance_estimate, fit_variance, VarianceFit
 export MarchenkoPastur
 export Shrinker, HardThreshold, FrobeniusShrinker, OperatorShrinker, NuclearShrinker, GramShrinker

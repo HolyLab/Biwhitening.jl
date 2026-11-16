@@ -25,6 +25,15 @@
         @test all(≈(m), sum(Vhat; dims=1))
     end
 
+    @testset "scaled matrix" begin
+        @test scaled(bw, Y) ≈ Y ./ (bw.a .* bw.b')
+        @test scaled(bw, sparse(Y)) isa SparseMatrixCSC
+        @test scaled(bw, sparse(Y)) ≈ scaled(bw, Y)
+        @test_throws DimensionMismatch scaled(bw, Y[:, 1:end-1])
+        @test_throws "must have the size of the biwhitened matrix" scaled(bw, Y[:, 1:end-1])
+        @test_throws "offset arrays are not supported" scaled(bw, OffsetArray(Y, -1, -1))
+    end
+
     @testset "singular values and vectors" begin
         Yhat = Y ./ (bw.a .* bw.b')
         F = svd(Yhat)
@@ -84,6 +93,9 @@
             @test iszero(scores(bz, 1)[120, :])
             @test denoise(bz)[rows, cols] ≈ denoise(bw)
             @test iszero(denoise(bz)[120, :]) && iszero(denoise(bz)[:, 7])
+            Zh = scaled(bz, Z)
+            @test Zh[rows, cols] ≈ scaled(bw, Y)
+            @test iszero(Zh[120, :]) && iszero(Zh[:, [7, 500]])
             @test occursin("300×1000 without empty rows and columns", sprint(show, MIME"text/plain"(), bz))
         end
         @test_throws "every variance estimate is zero" biwhiten(zeros(3, 4))

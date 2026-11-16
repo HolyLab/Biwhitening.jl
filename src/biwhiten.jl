@@ -3,12 +3,12 @@
 
 The result of [`biwhiten`](@ref) for an `m × n` data matrix `Y`. Its fields are
 
-- `a`, `b`: the row and column scales. The normalized matrix is `Y ./ (a .* b')`, with the
-  rows and columns whose scale is zero set to zero.
-- `S`: every singular value of the normalized matrix without those rows and columns, in
+- `a`, `b`: the row and column scales. The scaled matrix, [`scaled`](@ref)`(bw, Y)`, is
+  `Y ./ (a .* b')`, with the rows and columns whose scale is zero set to zero.
+- `S`: all singular values of the scaled matrix after removing those rows and columns, in
   decreasing order.
-- `U`, `V`: the left and right singular vectors of the `rank` leading singular values, as
-  the columns of an `m × rank` and an `n × rank` matrix.
+- `U`, `V`: the left and right singular vectors of the `k = rank(bw)` largest singular
+  values, as the columns of an `m × k` and an `n × k` matrix.
 
 `rank(bw)` is the number of singular values above [`noise_edge`](@ref).
 [`noise_variance`](@ref) and [`ks_distance`](@ref) compare the spectrum with
@@ -38,9 +38,9 @@ end
 """
     noise_edge(bw::Biwhitened)
 
-The largest singular value expected of noise alone, `√m′ + √n′`, where `m′` and `n′` are the
-numbers of rows and columns of the data with a nonzero scale. `rank(bw)` counts the singular
-values `bw.S` above it.
+The largest singular value of the scaled matrix expected of noise alone, `√m′ + √n′`, where
+`m′` and `n′` are the numbers of rows and columns of the data with a nonzero scale.
+`rank(bw)` is the number of singular values in `bw.S` that exceed it.
 """
 function noise_edge(bw::Biwhitened{T}) where {T}
     p, q, _ = _shape(bw)
@@ -50,8 +50,8 @@ end
 """
     MarchenkoPastur(bw::Biwhitened)
 
-The distribution that the eigenvalues `bw.S .^ 2 ./ q` follow when the data are noise of the
-modeled variance, where `q` is the larger of the numbers of rows and columns with a nonzero
+The distribution of the eigenvalues `bw.S .^ 2 ./ q` when the data consist only of noise with
+the modeled variance. `q` is the larger of the numbers of rows and columns with a nonzero
 scale.
 """
 function MarchenkoPastur(bw::Biwhitened{T}) where {T}
@@ -68,17 +68,17 @@ end
 """
     noise_variance(bw::Biwhitened)
 
-The noise variance of the normalized matrix, estimated as the ratio of the median of its
-eigenvalues to the median of the Marchenko–Pastur law. It is close to one when the variance
-estimates given to [`biwhiten`](@ref) have the right overall scale. The median is used
-because a few components of signal do not move it.
+The noise variance of the scaled matrix, estimated as the ratio of the median of its
+eigenvalues to the median of the Marchenko–Pastur law. The median, unlike the mean, is
+barely affected by the few eigenvalues that come from the signal. The estimate is close to
+one when the variance estimates given to [`biwhiten`](@ref) have the right overall scale.
 """
 noise_variance(bw::Biwhitened) = median(_eigenvalues(bw)) / median(MarchenkoPastur(bw))
 
 """
     ks_distance(bw::Biwhitened)
 
-The Kolmogorov–Smirnov distance between the eigenvalues of the normalized matrix and the
+The Kolmogorov–Smirnov distance between the eigenvalues of the scaled matrix and the
 Marchenko–Pastur law: the largest difference between the fraction of eigenvalues below a
 point and the probability the law assigns below it. It is small when the variance estimates
 given to [`biwhiten`](@ref) describe the noise and the rank of the signal is small compared
@@ -108,21 +108,23 @@ end
     bw = biwhiten(Y, V::AbstractMatrix; kwargs...)
 
 Biwhiten the data matrix `Y`: find row scales `a` and column scales `b` such that the noise
-of the normalized matrix `Y ./ (a .* b')` has average variance one in every row and every
-column, and compute the singular values of the normalized matrix and the singular vectors of
-those above the largest expected of noise. The result is a [`Biwhitened`](@ref).
+of the scaled matrix `Y ./ (a .* b')` has average variance one in every row and every
+column. Then compute all singular values of the scaled matrix, and the singular vectors of
+those that exceed [`noise_edge`](@ref). The result is a [`Biwhitened`](@ref).
 
 The noise is described either by a `model` that gives the variance of an entry as a function
-of its expected value, or by a matrix `V` of variance estimates of the size of `Y`. The
+of its expected value, or by a matrix `V` of variance estimates of the same size as `Y`. The
 default model is the Poisson distribution, for which `V = Y`; this is the method of Landa,
 Zhang, and Kluger (2022). Each estimate in `V` must be nonnegative, should be unbiased, and
-must be computed from `Y` or from the measurements `Y` was computed from.
+must be computed from `Y` itself or from the measurements from which `Y` was derived.
 [`fit_variance`](@ref) chooses a model from the data.
 
-The scales are computed by `MatrixCovers.noise_cover`, which receives the keywords. Rows and
-columns of `V` that are entirely zero receive a zero scale and are left out of the spectrum.
-For some patterns of zeros in `V` no scaling exists, and `noise_cover` throws an error that
-names the rows or columns responsible. Removing them, or passing `shrink > 0`, resolves it.
+The scales are computed by `MatrixCovers.noise_cover`, to which all keywords are passed.
+Rows and columns of `V` that are entirely zero receive a zero scale and are left out of the
+spectrum. For some patterns of zeros in `V` no scaling exists, and `noise_cover` throws an
+error that names the rows or columns responsible. Removing those rows or columns resolves
+the error, as does passing the keyword `shrink=δ` with `δ > 0`. (This keyword is unrelated
+to the function [`shrink`](@ref).)
 
 `rank(bw)` assumes that the variance estimates have the right overall scale. Check that
 [`noise_variance`](@ref)`(bw)` is close to one and that [`ks_distance`](@ref)`(bw)` is small
@@ -135,7 +137,7 @@ julia> Y = [3 0 1 2; 0 2 5 1; 4 1 0 3];
 
 julia> bw = biwhiten(Y);
 
-julia> Vhat = Y ./ (bw.a .* bw.b') .^ 2;    # variance estimates for the normalized matrix
+julia> Vhat = Y ./ (bw.a .* bw.b') .^ 2;    # variance estimates for the scaled matrix
 
 julia> round.(sum(Vhat; dims=2); digits=8)
 3×1 Matrix{Float64}:
@@ -160,6 +162,40 @@ function biwhiten(Y::AbstractMatrix{<:Real}, V::AbstractMatrix{<:Real}; kwargs..
     return _biwhiten(Y, V, float(promote_type(eltype(Y), eltype(V))); kwargs...)
 end
 
+"""
+    Yh = scaled(bw::Biwhitened, Y)
+
+The scaled matrix `Y ./ (bw.a .* bw.b')` of the data `Y` given to [`biwhiten`](@ref), with
+the rows and columns whose scale is zero set to zero. This is the matrix that `biwhiten`
+analyzes, and it can be passed to other algorithms, such as other factorization or
+clustering methods. A sparse `Y` gives a sparse result.
+
+# Examples
+
+```jldoctest
+julia> Y = [3 0 1 2; 0 2 5 1; 4 1 0 3; 0 0 0 0];
+
+julia> bw = biwhiten(Y);
+
+julia> Yh = scaled(bw, Y);
+
+julia> iszero(Yh[4, :])                     # the empty row has scale zero
+true
+
+julia> all(isnan, (Y ./ (bw.a .* bw.b'))[4, :])
+true
+```
+"""
+function scaled(bw::Biwhitened, Y::AbstractMatrix)
+    Base.require_one_based_indexing(Y)
+    size(Y) == size(bw) ||
+        throw(DimensionMismatch("the data must have the size of the biwhitened matrix, $(size(bw)), but have size $(size(Y))"))
+    return Diagonal(_reciprocals(bw.a)) * Y * Diagonal(_reciprocals(bw.b))
+end
+
+# `1 ./ s`, except that zeros stay zero.
+_reciprocals(s) = map(x -> iszero(x) ? x : inv(x), s)
+
 function _biwhiten(Y, V, ::Type{T}; kwargs...) where {T}
     a, b, Yh, I, J = _normalize(Y, V, T; kwargs...)
     p, q = minmax(size(Yh)...)
@@ -169,7 +205,7 @@ function _biwhiten(Y, V, ::Type{T}; kwargs...) where {T}
     U, Vr = zeros(T, length(a), k), zeros(T, length(b), k)
     if k > 0
         # Singular vectors on the shorter side are eigenvectors of the Gram matrix; those on
-        # the longer side follow from the normalized matrix.
+        # the longer side follow from the scaled matrix.
         W = eigen(G, p-k+1:p).vectors[:, k:-1:1]
         if size(Yh, 1) <= size(Yh, 2)
             U[I, :] = W
@@ -182,8 +218,8 @@ function _biwhiten(Y, V, ::Type{T}; kwargs...) where {T}
     return Biwhitened{T}(a, b, S, U, Vr)
 end
 
-# The scales for the variance estimates `V`, the normalized matrix without the rows and
-# columns whose scale is zero, and the indices of the rows and columns it keeps.
+# The scales for the variance estimates `V`, the scaled matrix without the rows and columns
+# whose scale is zero, and the indices of the rows and columns it keeps.
 function _normalize(Y, V, ::Type{T}; kwargs...) where {T}
     a0, b0, _ = noise_cover(V; kwargs...)
     a, b = convert(Vector{T}, a0), convert(Vector{T}, b0)
@@ -197,9 +233,9 @@ end
 # The Gram matrix of the shorter side of `Yh`.
 _gram(Yh::Matrix) = Symmetric(size(Yh, 1) <= size(Yh, 2) ? Yh * Yh' : Yh' * Yh)
 
-# For other storage, such as sparse, the Gram matrix is accumulated from dense blocks of the
-# longer side: it is dense even when `Yh` is sparse, and a product of dense blocks is faster
-# than a sparse product with a dense result.
+# For other storage, such as sparse, the Gram matrix is accumulated from dense blocks taken
+# along the longer side. The Gram matrix is dense even when `Yh` is sparse, and products of
+# dense blocks are faster than a sparse product with a dense result.
 function _gram(Yh::AbstractMatrix{T}) where {T}
     rowsshort = size(Yh, 1) <= size(Yh, 2)
     p, q = minmax(size(Yh)...)

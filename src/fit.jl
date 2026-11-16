@@ -6,7 +6,7 @@ The result of [`fit_variance`](@ref). Its fields are
 - `model`: the fitted [`QuadraticVariance`](@ref);
 - `β`, `α`: the weight of the quadratic term and the overall scale of the chosen variance
   estimate `α * ((1 - β) * y + β * y^2)`;
-- `ks`: the Kolmogorov–Smirnov distance between the eigenvalues of the normalized matrix and
+- `ks`: the Kolmogorov–Smirnov distance between the eigenvalues of the scaled matrix and
   the Marchenko–Pastur law for that estimate;
 - `scan`: `β`, `α`, `ks`, and the number of singular values above the noise (`rank`) for
   every candidate `β`.
@@ -39,15 +39,15 @@ end
 
 Choose a [`QuadraticVariance`](@ref) for the nonnegative data matrix `Y` by the method of
 Landa, Zhang, and Kluger (2022, section 5.1), and return a [`VarianceFit`](@ref);
-`fit.model` is the model.
+`fit.model` is the chosen model.
 
 For each `β` in `grid`, `Y` is biwhitened with the variance estimate
 `(1 - β) * y + β * y^2`, which interpolates between a variance proportional to the expected
-value (`β = 0`) and to its square (`β = 1`). The overall scale `α` of the estimate is set so
-that the median eigenvalue of the normalized matrix equals the median of the
-Marchenko–Pastur law, and the `β` with the smallest Kolmogorov–Smirnov distance between the
-eigenvalues and the law is chosen. The estimate `α * ((1 - β) * y + β * y^2)` is the
-[`variance_estimate`](@ref) of the model with
+value (`β = 0`) and one proportional to its square (`β = 1`). An overall scale `α` is then
+set so that the median eigenvalue of the scaled matrix equals the median of the
+Marchenko–Pastur law. The fit chooses the `β` whose eigenvalues have the smallest
+Kolmogorov–Smirnov distance to the law. The chosen estimate, `α * ((1 - β) * y + β * y^2)`,
+is the [`variance_estimate`](@ref) of the model with
 
     a = 0,    b = α * (1 - β) / (1 - α * β),    c = α * β / (1 - α * β)
 
@@ -55,12 +55,12 @@ No such model exists when `α * β ≥ 1`, and the fit then throws an error. `fi
 results for every candidate; a distance that changes little across `grid` means that the
 spectrum does not determine `β`.
 
-The keywords are those of [`biwhiten`](@ref). The fit takes one biwhitening for each element
+The keywords are those of [`biwhiten`](@ref). The fit costs one biwhitening for each element
 of `grid`.
 
-The distance of the chosen model is biased downward by the selection. To assess the fit, fit
-the model on some of the rows of `Y` and compute [`ks_distance`](@ref) of the remaining rows
-biwhitened with that model.
+Because the model is selected for its small distance, `fit.ks` is biased downward. To assess
+the fit without this bias, fit the model on some of the rows of `Y`, biwhiten the remaining
+rows with it, and compute their [`ks_distance`](@ref).
 """
 function fit_variance(Y::AbstractMatrix{<:Real}; grid=0:0.05:1, kwargs...)
     Base.require_one_based_indexing(Y)

@@ -9,6 +9,7 @@ CurrentModule = Biwhitening
 ```@docs
 biwhiten
 Biwhitened
+scaled
 noise_edge
 noise_variance
 ks_distance

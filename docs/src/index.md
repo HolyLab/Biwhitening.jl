@@ -5,16 +5,23 @@ CurrentModule = Biwhitening
 # Biwhitening
 
 [Biwhitening](https://github.com/HolyLab/Biwhitening.jl) separates signal from noise in a
-data matrix whose noise variance differs from entry to entry, as it does for counts. It
-implements the method of [Landa, Zhang, and Kluger (2022)](@ref References):
+data matrix whose noise variance differs from entry to entry, as it does for counts. When
+the noise has constant variance, its eigenvalues follow the Marchenko–Pastur law, and
+components of the signal stand out above the edge of that law. Unequal variances change the
+noise spectrum in a way that depends on the unknown pattern of variances, so that no fixed
+threshold separates signal from noise. The method of
+[Landa, Zhang, and Kluger (2022)](@ref References) restores the law by rescaling the data:
 
 1. Estimate the noise variance of each entry.
 2. Scale the rows and columns of the data so that the noise has average variance one in
-   every row and every column. The eigenvalues of pure noise then follow the
-   Marchenko–Pastur law.
-3. Count the singular values of the scaled matrix that lie above the largest one expected of
-   noise. Their number estimates the rank of the signal.
+   every row and every column.
+3. Count the singular values of the scaled matrix that exceed the largest singular value
+   expected of noise. Their number estimates the rank of the signal.
 4. Estimate the signal from those components.
+
+Unlike a variance-stabilizing transformation, the rescaling in step 2 leaves the rank of the
+signal unchanged; see
+[Comparison with variance-stabilizing transformations](@ref).
 
 The scaling of step 2 is computed by
 [MatrixCovers.jl](https://github.com/HolyLab/MatrixCovers.jl), whose
@@ -30,8 +37,9 @@ Pkg.add(url="https://github.com/HolyLab/Biwhitening.jl")
 
 ## A first example
 
-The example uses simulated counts: a matrix of expected values of rank 5, whose rows and
-columns differ in their totals, and Poisson noise.
+The example simulates counts with Poisson noise around a matrix `X` of expected values. `X`
+has rank 5, and its rows and columns differ widely in scale, so the noise variance differs
+from entry to entry.
 
 ```@example guide
 using Biwhitening, LinearAlgebra, Random
@@ -58,16 +66,17 @@ nothing # hide
 bw = biwhiten(Y)
 ```
 
-Five singular values of the scaled matrix lie above [`noise_edge`](@ref), the largest
-expected of noise:
+Five singular values of the scaled matrix exceed [`noise_edge`](@ref), the largest singular
+value expected of noise:
 
 ```@example guide
 round.(bw.S[1:8]; digits=1)', noise_edge(bw)
 ```
 
 The result holds the scales `bw.a` and `bw.b`, every singular value `bw.S`, and the singular
-vectors `bw.U` and `bw.V` of the components above the noise. The scaled matrix itself is
-`Y ./ (bw.a .* bw.b')`.
+vectors `bw.U` and `bw.V` of the components above the noise.
+
+[`scaled`](@ref)`(bw, Y)` returns the scaled matrix itself.
 
 ## Checking the variance model
 
@@ -75,16 +84,16 @@ The rank is meaningful only if the variances given to `biwhiten` describe the no
 numbers, both shown when a result is displayed, test this:
 
 - [`noise_variance`](@ref) is the noise variance of the scaled matrix, estimated from its
-  median eigenvalue. It should be close to one. A larger value means that the noise is
-  larger than the model says, and the rank is then overestimated.
+  median eigenvalue. It should be close to one. A larger value means that the noise exceeds
+  what the model predicts, and the rank is then overestimated.
 - [`ks_distance`](@ref) is the Kolmogorov–Smirnov distance between the eigenvalues and the
   Marchenko–Pastur law. Each component of the signal contributes one eigenvalue that the law
   does not describe, so the distance is at least the rank divided by the number of
   eigenvalues (here 5/400).
 
-[`MarchenkoPastur`](@ref)`(bw)` is the law for the eigenvalues `bw.S .^ 2 ./ q`, where `q` is
-the larger dimension of the matrix. Its density, `Biwhitening.pdf`, can be drawn over a
-histogram of the eigenvalues.
+`d = `[`MarchenkoPastur`](@ref)`(bw)` is the law for the eigenvalues `bw.S .^ 2 ./ q`, where
+`q` is the larger dimension of the matrix. Its probability density, the function
+[`Biwhitening.pdf`](@ref)`(d, x)`, can be drawn over a histogram of the eigenvalues.
 
 ## Choosing the variance model
 
@@ -102,7 +111,8 @@ Ynb = [poisson(rng, x * gamma4(rng)) for x in X]
 biwhiten(Ynb)
 ```
 
-The fit tries a grid of weights `β` of the quadratic term:
+The fit tries a grid of weights `β` for the quadratic term and keeps the one whose spectrum
+is closest to the law:
 
 ```@example guide
 fit = fit_variance(Ynb; grid=0:0.1:1)
@@ -113,21 +123,21 @@ bwnb = biwhiten(Ynb, fit.model)
 ```
 
 The fitted coefficients are close to the true ones (`b = 1`, `c = 0.25`), the noise variance
-is one, and the rank is recovered.
+is close to one, and the rank is recovered.
 
-Three points deserve attention when fitting:
+Three caveats apply to the fit:
 
 - `fit.scan` lists every candidate. When the distance changes little over a range of `β`,
-  the spectrum does not determine `β` within that range, and neither does it determine the
-  rank more precisely than the ranks listed for those candidates.
-- The distance of the chosen candidate is biased downward, because it was selected. To
-  assess the model, fit it on part of the rows and compute `ks_distance` for the rest,
-  biwhitened with the fitted model.
+  the spectrum does not determine `β` within that range. The rank is then uncertain to the
+  extent that the candidates in that range disagree about it.
+- Because the chosen candidate was selected for its small distance, that distance is biased
+  downward. To assess the model without this bias, fit it on some of the rows, biwhiten the
+  remaining rows with the fitted model, and compute their `ks_distance`.
 - With `grid=[0]`, the fit keeps the variance proportional to the expected value and
   estimates only the constant of proportionality.
 
-For data that are not counts, pass a matrix of variance estimates as the second argument of
-`biwhiten`.
+For data that are not counts, pass a matrix of variance estimates, of the same size as the
+data, as the second argument of `biwhiten`.
 
 ## Estimating the signal
 
@@ -140,8 +150,9 @@ singular value by an estimate that accounts for both effects
 round.([bw.S[1:5] shrink(bw, OperatorShrinker()) shrink(bw, FrobeniusShrinker())]; digits=1)
 ```
 
-[`denoise`](@ref) assembles the components with shrunk singular values and multiplies by the
-scales, which gives an estimate of the expected value of the data in its own units:
+[`denoise`](@ref) rebuilds the matrix from the components with shrunk singular values and
+undoes the scaling. The result estimates the expected value of the data; below, its relative
+error is compared with that of the data themselves:
 
 ```@example guide
 Xhat = denoise(bw)
@@ -173,21 +184,49 @@ The rules differ in what they estimate best:
 ## Zeros, empty rows, and sparse data
 
 `biwhiten` accepts sparse matrices and matrices of integers. Rows and columns without any
-nonzero variance estimate receive a scale of zero and take no part in the result.
+nonzero variance estimate receive a scale of zero and are left out of the spectrum.
 
-For some patterns of zeros no scaling exists: for example, a row whose only nonzero entries
-lie in a few columns. `biwhiten` then throws an error that names the rows or columns
-responsible. Either remove them, or pass `shrink=δ` with a small positive `δ`, which mixes
-the variance estimates with those of a rank-one model so that the scaling always exists. The
+For some patterns of zeros no scaling exists: for example, a row whose nonzero entries lie in
+too few columns. `biwhiten` then throws an error that names the rows or columns responsible.
+Either remove them, or pass the keyword `shrink=δ` with a small positive `δ`. (This keyword
+is unrelated to the function [`shrink`](@ref).) It mixes the variance estimates with those of
+a rank-one model, so that the scaling always exists. The
 [MatrixCovers documentation](https://holylab.github.io/MatrixCovers.jl/stable/noise/#noise-zeros)
 describes the condition and the meaning of `δ`.
 
+## Comparison with variance-stabilizing transformations
+
+A variance-stabilizing transformation equalizes noise variances in a different way: it
+applies a nonlinear function to each entry, such as the square root for Poisson counts or
+`log(1 + y)`, so that the noise variance is approximately the same in every entry.
+Biwhitening equalizes only the average variance of each row and column. In exchange, it
+preserves linearity, on which matrix factorization depends.
+
+Factorization methods such as principal component analysis represent the data as a sum of
+components, and the rank of the signal is the number of components needed. Biwhitening
+divides each entry by a constant, so the expected value of the scaled matrix,
+`X ./ (a .* b')`, has the same rank as the expected value `X` of the data
+([Landa, Zhang, and Kluger, 2022](@ref References), eq. 2.3), and counts that add before
+scaling still add after it. A nonlinear transformation `f` preserves neither property:
+`f.(X)` generally has higher rank than `X`, and the expected value of `f.(Y)` is not
+`f.(X)`. The components found in transformed data therefore need not correspond to those of
+the signal, and their number need not equal its rank.
+
+Both approaches need a model of the noise variance: the square root stabilizes Poisson noise,
+for example, but not overdispersed noise. Variance-stabilizing transformations are also
+approximate, and least accurate for small expected values, which predominate in sparse
+counts. Biwhitening rests instead on an asymptotic theorem, which assumes that the noise is
+independent from entry to entry (Landa, Zhang, and Kluger, Theorem 2.2 and
+Proposition 4.1). Finally, because the scales weight rows and columns unequally, the singular
+vectors of the scaled matrix differ from those of the unscaled signal. [`denoise`](@ref)
+undoes the scaling, but [`scores`](@ref) are coordinates in the scaled matrix.
+
 ## Cost
 
-`biwhiten` forms the dense Gram matrix of the shorter side of the data and computes all of
-its eigenvalues. For an `m × n` matrix with `m ≤ n` this takes memory proportional to `m^2`
-and time proportional to `m^2 * n + m^3`, whether or not the data are sparse.
-`fit_variance` repeats this for every element of its grid.
+For an `m × n` matrix with `m ≤ n`, `biwhiten` forms the dense `m × m` Gram matrix of the
+scaled data and computes all of its eigenvalues. This takes memory proportional to `m^2` and
+time proportional to `m^2 * n + m^3`, whether or not the data are sparse. `fit_variance`
+repeats this for every element of its grid.
 
 ## References
 

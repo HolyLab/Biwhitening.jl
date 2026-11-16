@@ -7,10 +7,10 @@ its expected value `x`:
 
     Var(y) = a + b*x + c*x^2
 
-The default, `QuadraticVariance()`, is the Poisson distribution. Other members are the
-negative binomial with dispersion `θ` (`c = 1/θ`), the binomial with `n` trials
-(`c = -1/n`), the gamma distribution with shape `k` (`b = 0`, `c = 1/k`), and noise of
-constant variance `a` (`b = c = 0`). `c = -1` is excluded, because the variance cannot then
+The default, `QuadraticVariance()`, is the Poisson distribution. Other choices of the
+coefficients describe the negative binomial distribution with dispersion `θ` (`c = 1/θ`),
+the binomial with `n` trials (`c = -1/n`), the gamma distribution with shape `k` (`b = 0`,
+`c = 1/k`), and noise of constant variance `a` (`b = c = 0`). `c = -1` is excluded, because the variance cannot then
 be estimated from a single observation.
 
 [`variance_estimate`](@ref) estimates the variance of an entry from its value, and

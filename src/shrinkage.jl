@@ -1,17 +1,17 @@
 """
     Shrinker
 
-A rule that replaces each singular value of a biwhitened matrix that lies above the noise by
-an estimate of the corresponding singular value of the signal. The rules are
-[`HardThreshold`](@ref), [`FrobeniusShrinker`](@ref), [`OperatorShrinker`](@ref),
-[`NuclearShrinker`](@ref), and [`GramShrinker`](@ref); [`shrink`](@ref) applies one.
+A rule for estimating the singular values of the signal from those singular values of the
+scaled matrix that exceed [`noise_edge`](@ref). The rules are [`HardThreshold`](@ref),
+[`FrobeniusShrinker`](@ref), [`OperatorShrinker`](@ref), [`NuclearShrinker`](@ref), and
+[`GramShrinker`](@ref); [`shrink`](@ref) applies one.
 
-In the limit of a large matrix, a component of the signal with singular value `x√q` (with `q`
-the larger dimension) appears in the normalized matrix with a larger singular value `y√q`,
-and its singular vectors are tilted away from those of the signal, by angles with cosines
-`c₁` for the rows and `c₂` for the columns. `x`, `c₁`, and `c₂` are functions of `y` and of
-the aspect ratio of the matrix, and each rule is a function of them (Gavish and Donoho,
-2017).
+Noise inflates the singular values of the signal and tilts its singular vectors. Let `q` be
+the larger dimension of the scaled matrix. In the limit of a large matrix, a component of
+the signal with singular value `x√q` appears in the scaled matrix with a larger singular
+value `y√q`. The angles between its observed singular vectors and those of the signal have
+cosines `c₁` for the left singular vector (in `bw.U`) and `c₂` for the right (in `bw.V`). `x`, `c₁`, and `c₂` are functions of `y` and of the aspect ratio of the matrix, and
+each rule is a function of them (Gavish and Donoho, 2017).
 """
 abstract type Shrinker end
 
@@ -33,8 +33,8 @@ struct FrobeniusShrinker <: Shrinker end
 """
     OperatorShrinker()
 
-The [`Shrinker`](@ref) `x`, the singular value of the signal. The estimate of the signal has
-the smallest error in the operator norm.
+The [`Shrinker`](@ref) `x`, which estimates the singular value of the signal itself. The
+resulting estimate of the signal has the smallest error in the operator norm.
 """
 struct OperatorShrinker <: Shrinker end
 
@@ -85,9 +85,9 @@ _shrunk(s::GramShrinker, y, x, c1, c2) = x * (s.dim == 1 ? c1 : c2)
 """
     η = shrink(bw::Biwhitened, shrinker::Shrinker=FrobeniusShrinker())
 
-Estimates of the singular values of the signal in the normalized matrix, one for each of the
+Estimates of the singular values of the signal in the scaled matrix, one for each of the
 `rank(bw)` singular values above the noise, under the rule `shrinker`. They assume that the
-noise of the normalized matrix has variance one (see [`noise_variance`](@ref)).
+noise of the scaled matrix has variance one (see [`noise_variance`](@ref)).
 
 # Examples
 
@@ -121,10 +121,10 @@ end
     Z = scores(bw::Biwhitened, dim, shrinker::Shrinker=HardThreshold())
 
 Coordinates of the rows (`dim = 1`) or columns (`dim = 2`) of the data on the `rank(bw)`
-components above the noise: the singular vectors `bw.U` or `bw.V`, each multiplied by its
-singular value as [`shrink`](@ref) returns it under `shrinker`. `Z` has one row for each row
-(or column) of the data and one column for each component. With the default `shrinker`,
-these are the principal component scores of the normalized matrix, in which the noise has
+components above the noise: the singular vectors `bw.U` or `bw.V`, each multiplied by the
+corresponding singular value from [`shrink`](@ref)`(bw, shrinker)`. `Z` has one row for each
+row (or column) of the data and one column for each component. With the default `shrinker`,
+these are the principal component scores of the scaled matrix, in which the noise has
 unit variance in each coordinate. Rows and columns whose scale is zero have zero scores.
 """
 function scores(bw::Biwhitened, dim::Integer, shrinker::Shrinker=HardThreshold())
@@ -135,10 +135,10 @@ end
 """
     X = denoise(bw::Biwhitened, shrinker::Shrinker=FrobeniusShrinker())
 
-An estimate of the expected value of the data, as a dense matrix of the size of the data:
-the components of the normalized matrix above the noise, with singular values from
-[`shrink`](@ref) under `shrinker`, multiplied by the scales `bw.a` and `bw.b` to return them
-to the units of the data.
+An estimate of the expected value of the data, as a dense matrix of the same size as the
+data. It is assembled from the components of the scaled matrix above the noise, with
+singular values from [`shrink`](@ref)`(bw, shrinker)`, and multiplied by the scales `bw.a`
+and `bw.b` to return it to the units of the data.
 """
 function denoise(bw::Biwhitened, shrinker::Shrinker=FrobeniusShrinker())
     shrinker isa GramShrinker &&

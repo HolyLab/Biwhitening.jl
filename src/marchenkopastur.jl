@@ -1,12 +1,12 @@
 """
     MarchenkoPastur(γ)
 
-The Marchenko–Pastur distribution with aspect ratio `0 < γ ≤ 1` and unit noise variance: the
-limiting distribution of the eigenvalues of `E * E' / q` for a `p × q` matrix `E` of
-independent entries with mean zero and variance one, as `p` and `q` grow with `p / q → γ`.
+The Marchenko–Pastur distribution with aspect ratio `0 < γ ≤ 1`: the limiting distribution
+of the eigenvalues of `E * E' / q` for a `p × q` matrix `E` of independent entries with mean
+zero and variance one, as `p` and `q` grow with `p / q → γ`.
 
-Its support is `extrema(d) == ((1 - √γ)^2, (1 + √γ)^2)`. [`Biwhitening.pdf`](@ref),
-[`Biwhitening.cdf`](@ref), `quantile`, and `median` evaluate it.
+For `d = MarchenkoPastur(γ)`, the support is `extrema(d) == ((1 - √γ)^2, (1 + √γ)^2)`.
+[`Biwhitening.pdf`](@ref), [`Biwhitening.cdf`](@ref), `quantile`, and `median` evaluate it.
 
 # Examples
 

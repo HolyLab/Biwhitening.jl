@@ -2,7 +2,7 @@ using Biwhitening
 using Biwhitening: cdf, pdf
 using LinearAlgebra
 using OffsetArrays: OffsetArray
-using SparseArrays: sparse
+using SparseArrays: SparseMatrixCSC, sparse
 using StableRNGs: StableRNG
 using Statistics: median, quantile
 using Aqua
