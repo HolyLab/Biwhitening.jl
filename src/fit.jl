@@ -35,13 +35,13 @@ function Base.show(io::IO, ::MIME"text/plain", fit::VarianceFit{T}) where {T}
 end
 
 """
-    fit = fit_variance(Y; grid=0:0.05:1, kwargs...)
+    fit = fit_variance(Y; grid=0:0.2:1, refine=2, kwargs...)
 
 Choose a [`QuadraticVariance`](@ref) for the nonnegative data matrix `Y` by the method of
 Landa, Zhang, and Kluger (2022, section 5.1), and return a [`VarianceFit`](@ref);
 `fit.model` is the chosen model.
 
-For each `β` in `grid`, `Y` is biwhitened with the variance estimate
+For each candidate `β`, `Y` is biwhitened with the variance estimate
 `(1 - β) * y + β * y^2`, which interpolates between a variance proportional to the expected
 value (`β = 0`) and one proportional to its square (`β = 1`). An overall scale `α` is then
 set so that the median eigenvalue of the scaled matrix equals the median of the
@@ -52,23 +52,43 @@ is the [`variance_estimate`](@ref) of the model with
 
     a = 0,    b = α * (1 - β) / (1 - α * β),    c = α * β / (1 - α * β)
 
-No such model exists when `α * β ≥ 1`, and the fit then throws an error. `fit.scan` holds the
-results for every candidate in order of `β`; a distance that changes little across `grid`
-means that the spectrum does not determine `β`.
+No such model exists when `α * β ≥ 1`, and the fit then throws an error.
 
-The keywords are those of [`biwhiten`](@ref). The fit costs one biwhitening for each element
-of `grid`.
+The candidates are the elements of `grid`, followed by `refine` rounds of refinement. Each
+round adds the midpoints between the best candidate so far and its neighbors on either
+side, which halves the spacing around the minimum. The defaults examine at most ten
+candidates and locate `β` to within 0.05. The refinement finds the best `β` only if the
+distance has a single minimum at the spacing of `grid`; with `refine=0` the candidates are
+exactly those of `grid`. `fit.scan` holds the results for every candidate in order of `β`;
+a distance that changes little across them means that the spectrum does not determine `β`.
+
+The remaining keywords are those of [`biwhiten`](@ref). The fit costs one biwhitening for
+each candidate.
 
 Because the model is selected for its small distance, `fit.ks` is biased downward. To assess
 the fit without this bias, fit the model on some of the rows of `Y`, biwhiten the remaining
 rows with it, and compute their [`ks_distance`](@ref).
 """
-function fit_variance(Y::AbstractMatrix{<:Real}; grid=0:0.05:1, kwargs...)
+function fit_variance(Y::AbstractMatrix{<:Real}; grid=0:0.2:1, refine::Integer=2, kwargs...)
     Base.require_one_based_indexing(Y)
     T = float(eltype(Y))
     isempty(grid) && throw(ArgumentError("`grid` must not be empty"))
     all(β -> 0 <= β <= 1, grid) || throw(ArgumentError("every element of `grid` must lie in [0, 1], got $grid"))
+    refine >= 0 || throw(ArgumentError("`refine` must not be negative, got $refine"))
     scan = [_scanpoint(Y, β; kwargs...) for β in sort!(unique!(T[β for β in grid]))]
+    for _ in 1:refine
+        k = _best(scan)
+        βs = T[]
+        for j in (k - 1, k + 1)
+            checkbounds(Bool, scan, j) || continue
+            mid = (scan[j].β + scan[k].β) / 2
+            # Adjacent floating-point numbers have no number between them.
+            min(scan[j].β, scan[k].β) < mid < max(scan[j].β, scan[k].β) && push!(βs, mid)
+        end
+        isempty(βs) && break
+        append!(scan, [_scanpoint(Y, β; kwargs...) for β in βs])
+        sort!(scan; by=s -> s.β)
+    end
     best = scan[_best(scan)]
     d = 1 - best.α * best.β
     d > 0 || throw(ArgumentError("the best candidate, β = $(best.β) with α = $(best.α), has α * β ≥ 1 and corresponds to no quadratic variance"))
